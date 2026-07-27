@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Generated USD scenes (regenerable from source) — keep the sample floor plan
+output/*.usda
+output/*.usdc
+output/*.usd
+!output/floorplan.png
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

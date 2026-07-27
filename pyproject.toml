@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factory-twin"
+version = "0.1.0"
+description = "Procedurally-generated factory production-line digital twin in OpenUSD"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "usd-core>=24.0",
+    "matplotlib>=3.7",
+]
+
+[project.scripts]
+factory-twin-build = "factory_twin.build_scene:main"
+factory-twin-preview = "factory_twin.preview:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
