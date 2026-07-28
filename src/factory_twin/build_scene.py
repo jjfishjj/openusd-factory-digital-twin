@@ -20,7 +20,7 @@ from pathlib import Path
 
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux
 
-from . import assets
+from . import assets, physics
 
 
 def _add_amr_path(stage, path, points):
@@ -57,9 +57,13 @@ def build(out_path: str) -> str:
 
     LINE_LEN = 20.0  # metres of production line
 
-    # --- floor ---
+    # --- physics: gravity + a ground collider ---
+    physics.setup_physics_scene(stage)
+
+    # --- floor (also a static collider so bodies rest on it) ---
     floor = assets.build_floor(stage, "/World/Floor", width=16, length=LINE_LEN + 4)
     assets.bind(floor, m_floor)
+    physics.make_static_collider(floor)
 
     # --- conveyor down the centre ---
     conv = assets.build_conveyor(stage, "/World/Conveyor", length=LINE_LEN)
@@ -75,16 +79,18 @@ def build(out_path: str) -> str:
         assets.bind(p, m_part)
 
     # --- robot-arm workstations along the +X side of the belt ---
-    stations = UsdGeom.Xform.Define(stage, "/World/Workstations").GetPrim()
+    # each is a UsdPhysics articulation (see physics.py) posed slightly
+    # differently so the line looks like it is working.
+    UsdGeom.Xform.Define(stage, "/World/Workstations")
+    poses = [(20, -40, 80), (-15, -55, 60), (30, -30, 90), (0, -50, 70)]
     for i in range(4):
         y = -LINE_LEN / 2 + (i + 0.5) * (LINE_LEN / 4)
-        base_path = f"/World/Workstations/Robot_{i:02d}"
-        root, _ = assets.build_robot_arm(stage, base_path)
-        UsdGeom.Xformable(root).AddTranslateOp().Set(Gf.Vec3d(2.0, y, 0))
-        # face the belt (rotate so the gripper reaches toward -X)
-        UsdGeom.Xformable(root).AddRotateZOp().Set(-90 if i % 2 == 0 else -90)
-        for child in root.GetChildren():
-            assets.bind(child, m_robot if child.GetName() != "Base" else m_steel)
+        root = physics.build_robot_arm_articulated(
+            stage, f"/World/Workstations/Robot_{i:02d}",
+            mats={"steel": m_steel, "robot": m_robot}, pose=poses[i])
+        xf = UsdGeom.Xformable(root)
+        xf.AddTranslateOp().Set(Gf.Vec3d(2.0, y, 0))
+        xf.AddRotateZOp().Set(-90)  # turn to face the belt (-X side)
 
     # --- storage racks defined ONCE as a prototype, then instanced ---
     # This is how digital twins stay light at scale: one authored rack,
