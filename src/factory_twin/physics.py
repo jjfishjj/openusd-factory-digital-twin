@@ -46,6 +46,33 @@ def make_static_collider(prim):
     return prim
 
 
+def add_collider(gprim):
+    """Attach a collision shape to a gprim. If an ancestor has RigidBodyAPI the
+    shape moves with that body; otherwise it is static world geometry."""
+    UsdPhysics.CollisionAPI.Apply(gprim)
+    return gprim
+
+
+def make_kinematic_body(prim, mass=2.0):
+    """A kinematic rigid body: follows its authored (time-sampled) transform
+    exactly, yet still collides with and pushes dynamic bodies. This is how the
+    conveyor workpieces both animate AND interact with the physics world.
+    Apply add_collider() to its child geometry to give it a collision shape."""
+    rb = UsdPhysics.RigidBodyAPI.Apply(prim)
+    rb.CreateKinematicEnabledAttr(True)
+    UsdPhysics.MassAPI.Apply(prim).CreateMassAttr(mass)
+    return prim
+
+
+def make_dynamic_body(prim, mass=2.0):
+    """A free dynamic rigid body — falls under gravity, collides, comes to rest.
+    Used for the loose parts that drop onto the belt in Isaac Sim.
+    Apply add_collider() to its child geometry to give it a collision shape."""
+    UsdPhysics.RigidBodyAPI.Apply(prim)
+    UsdPhysics.MassAPI.Apply(prim).CreateMassAttr(mass)
+    return prim
+
+
 # ---------------------------------------------------------------------------
 # Rigid-body link + revolute joint helpers
 # ---------------------------------------------------------------------------

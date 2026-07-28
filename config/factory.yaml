@@ -1,0 +1,40 @@
+# Factory digital-twin layout — edit this and re-run `factory-twin-build` to
+# generate a different plant. Every number below drives the generated USD.
+
+line:
+  length: 20.0          # metres of production line (runs along +Y)
+  floor_width: 16.0
+
+conveyor:
+  width: 1.2
+  height: 0.8
+
+workpieces:
+  count: 6              # kinematic parts riding the belt
+  speed: 2.5           # m/s along +Y (wraps at the end -> continuous flow)
+
+robots:
+  count: 4
+  offset_x: 2.0        # +X side of the belt
+  poses:               # per-robot DriveAPI targets [yaw, shoulder, elbow] deg
+    - [20, -40, 80]
+    - [-15, -55, 60]
+    - [30, -30, 90]
+    - [0, -50, 70]
+
+racks:
+  count: 3
+  offset_x: -4.5       # -X side (inbound storage)
+  bays: 3
+  levels: 3
+
+amr:
+  offset_x: -2.2
+
+animation:
+  fps: 24              # the loop period is derived: line.length / workpieces.speed
+
+physics:
+  gravity: 9.81        # m/s^2, along -Z
+  dynamic_parts: 3     # loose rigid bodies that drop onto the belt in Isaac Sim
+  drop_height: 2.0     # metres above the belt they start

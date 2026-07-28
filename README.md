@@ -9,6 +9,12 @@ and emits a `.usd` scene that opens directly in Omniverse / USD Composer /
 Isaac Sim on any RTX machine, where the placeholder primitives can be swapped
 for real CAD assets and lit with RTX path tracing.
 
+![Conveyor flow animation](output/conveyor.gif)
+
+*Conveyor flow, rendered GPU-free straight from the USD time samples. Red =
+kinematic workpieces riding the belt; green = dynamic parts that drop in Isaac
+Sim; orange = robot-arm articulations; blue = instanced racks; yellow = AMR + route.*
+
 ![Factory floor plan](output/floorplan.png)
 
 ## Why this is an Omniverse project without an Omniverse install
@@ -30,6 +36,10 @@ layers directly, which is the transferable, portable core skill:
   a baked mesh, so a nav stack (or Isaac Sim) can consume it.
 - **Physics & articulation** — the robot arms are real `UsdPhysics`
   articulations (see below), so Isaac Sim loads them as drivable robots.
+- **Animation** — workpieces are kinematic bodies driven by **time-sampled**
+  transforms, so the conveyor flow is authored in the file and loops seamlessly.
+- **Data-driven** — the whole plant is generated from a YAML config; no code
+  edits needed to change the layout.
 
 ## Physics & articulation
 
@@ -73,12 +83,17 @@ print('articulations', sum(p.HasAPI(P.ArticulationRootAPI) for p in s.Traverse()
 
 | Asset | Count | Notes |
 |-------|-------|-------|
-| Conveyor belt | 1 | 20 m, runs along +Y (material-flow direction) |
-| Workpieces | 6 | parts spaced along the belt |
+| Conveyor belt | 1 | 20 m, runs along +Y (material-flow direction), collider bed |
+| Workpieces | 6 | **kinematic** parts, time-sampled flow along the belt |
+| Drop parts | 3 | **dynamic** rigid bodies that fall onto the belt in Isaac Sim |
 | Robot-arm workstations | 4 | 3-DOF **UsdPhysics articulations**, along the +X side |
 | Storage racks | 3 | `instanceable` — 3 bays × 3 levels each |
 | AMR + route | 1 | mobile robot with a dashed loop path |
 | Lights | 2 | dome + distant key |
+
+All counts, positions, speeds and robot poses come from
+[`config/factory.yaml`](config/factory.yaml) — edit it and re-run to generate a
+different plant.
 
 ## Quick start
 
@@ -87,20 +102,16 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
-# generate the USD scene
-factory-twin-build --out output/factory_twin.usda
+# generate the USD scene from the YAML config
+factory-twin-build --config config/factory.yaml --out output/factory_twin.usda
 
-# render a GPU-free top-down floor-plan PNG
-factory-twin-preview --in output/factory_twin.usda --out output/floorplan.png
+# GPU-free previews
+factory-twin-preview --in output/factory_twin.usda --out output/floorplan.png   # static PNG
+factory-twin-animate --in output/factory_twin.usda --out output/conveyor.gif     # animated GIF
 ```
 
-Or without installing:
-
-```bash
-pip install usd-core matplotlib
-PYTHONPATH=src python -m factory_twin.build_scene  --out output/factory_twin.usda
-PYTHONPATH=src python -m factory_twin.preview      --in  output/factory_twin.usda --out output/floorplan.png
-```
+Change the plant by editing `config/factory.yaml` (line length, part count and
+speed, robot count/poses, rack grid, animation fps …) and re-running the build.
 
 ## Open it in Omniverse (on an RTX machine)
 
@@ -116,25 +127,28 @@ PYTHONPATH=src python -m factory_twin.preview      --in  output/factory_twin.usd
 ```
 src/factory_twin/
   assets.py        # reusable USD asset builders (materials, boxes, robot, rack, AMR)
-  physics.py       # UsdPhysics rigging: physics scene, articulated robot arms
-  build_scene.py   # assembles the full production line -> .usda
-  preview.py       # GPU-free top-down floor-plan renderer (matplotlib)
-output/            # generated .usda / .usdc / .png (git-ignored except the sample PNG)
+  physics.py       # UsdPhysics rigging: scene, articulated arms, kinematic/dynamic bodies
+  build_scene.py   # config-driven assembly of the full production line -> .usda
+  preview.py       # GPU-free renderers: floor-plan PNG + conveyor-flow GIF
+config/factory.yaml  # the layout config that drives build_scene
+output/            # generated .usda / .usdc (git-ignored) + sample PNG/GIF (tracked)
 ```
 
 ## Roadmap
 
 - [x] `UsdPhysics` rigid bodies + revolute joints so the arms articulate in Isaac Sim
-- [ ] Animate workpieces travelling down the belt (time-sampled transforms)
-- [ ] Parameterise the whole layout from a YAML config
+- [x] Animate workpieces travelling down the belt (time-sampled transforms)
+- [x] Parameterise the whole layout from a YAML config
+- [x] Conveyor + workpieces as physics bodies (kinematic parts ride, dynamic parts drop)
 - [ ] A proper 3D isometric preview (currently top-down only)
-- [ ] Conveyor + workpieces as physics bodies (parts ride / drop realistically)
+- [ ] Drive the robot joints on a timeline so the arms move in the GIF too
 
 ## Requirements
 
 - Python ≥ 3.10
 - [`usd-core`](https://pypi.org/project/usd-core/) — OpenUSD Python runtime
-- `matplotlib` — for the GPU-free preview only
+- `pyyaml` — reads the layout config
+- `matplotlib` + `pillow` — for the GPU-free PNG / GIF previews only
 
 ## License
 
