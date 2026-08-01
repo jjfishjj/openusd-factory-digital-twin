@@ -11,9 +11,11 @@ for real CAD assets and lit with RTX path tracing.
 
 ![Conveyor flow animation](output/conveyor.gif)
 
-*Conveyor flow, rendered GPU-free straight from the USD time samples. Red =
-kinematic workpieces riding the belt; green = dynamic parts that drop in Isaac
-Sim; orange = robot-arm articulations; blue = instanced racks; yellow = AMR + route.*
+*Conveyor flow **and staggered robot picks**, rendered GPU-free straight from the
+USD. Orange = robot arms drawn by forward kinematics from their time-sampled
+joint drive targets (reaching toward the belt and retracting); red = kinematic
+workpieces riding the belt; green = dynamic parts that drop in Isaac Sim; blue =
+instanced racks; yellow = AMR + route.*
 
 ![Factory floor plan](output/floorplan.png)
 
@@ -64,12 +66,17 @@ link2  (forearm + gripper)
 - Every revolute joint has angle **limits** and an angular **`DriveAPI`**
   (stiffness/damping + a target angle) — the actuation Isaac Sim reads to
   position the arm.
+- The shoulder and elbow drive targets are **time-sampled** into a pick-cycle
+  trajectory (phased per robot), so in Isaac Sim the arms actually reach toward
+  the belt and retract on the timeline — the correct way to command a robot
+  (author the joint trajectory, not the link transforms).
 
 > **Rest pose vs. driven pose:** the USD file stores the arm at rest (pointing
-> straight up). The `DriveAPI` target angles only bend the arm once **PhysX
-> simulates** it in Isaac Sim — a static USD viewer will show it upright. This
-> is expected: the drive targets are goals for the physics solver, not authored
-> transforms.
+> straight up) and the *motion* in the joint drive targets. The arm only bends
+> once a solver applies those targets. Isaac Sim does this with PhysX; for the
+> GPU-free GIF, `preview.py` runs **forward kinematics** on the same joint
+> angles to draw the driven pose. Both read one source of truth — the drive
+> targets — so the preview matches what PhysX produces.
 
 Verify the rigging without a GPU:
 
@@ -128,6 +135,7 @@ speed, robot count/poses, rack grid, animation fps …) and re-running the build
 src/factory_twin/
   assets.py        # reusable USD asset builders (materials, boxes, robot, rack, AMR)
   physics.py       # UsdPhysics rigging: scene, articulated arms, kinematic/dynamic bodies
+  kinematics.py    # forward kinematics for the arm (drives the GPU-free preview)
   build_scene.py   # config-driven assembly of the full production line -> .usda
   preview.py       # GPU-free renderers: floor-plan PNG + conveyor-flow GIF
 config/factory.yaml  # the layout config that drives build_scene
@@ -140,8 +148,9 @@ output/            # generated .usda / .usdc (git-ignored) + sample PNG/GIF (tra
 - [x] Animate workpieces travelling down the belt (time-sampled transforms)
 - [x] Parameterise the whole layout from a YAML config
 - [x] Conveyor + workpieces as physics bodies (kinematic parts ride, dynamic parts drop)
+- [x] Drive the robot joints on a timeline (time-sampled drive targets + FK preview)
 - [ ] A proper 3D isometric preview (currently top-down only)
-- [ ] Drive the robot joints on a timeline so the arms move in the GIF too
+- [ ] Close the loop: pick a workpiece when an arm reaches it (attach/detach)
 
 ## Requirements
 

@@ -129,6 +129,17 @@ def _revolute(stage, path, body0, body1, anchor, axis,
     return j
 
 
+def set_drive_target(joint_prim, angle_deg, time=None):
+    """Author an angular-drive target on a revolute joint. With `time` this
+    writes a time sample, building the commanded trajectory Isaac Sim's PD
+    controller follows (and that the FK preview reads to draw the motion)."""
+    attr = UsdPhysics.DriveAPI(joint_prim, "angular").GetTargetPositionAttr()
+    if time is None:
+        attr.Set(float(angle_deg))
+    else:
+        attr.Set(float(angle_deg), time=time)
+
+
 # ---------------------------------------------------------------------------
 # Articulated robot arm
 # ---------------------------------------------------------------------------

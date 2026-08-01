@@ -15,12 +15,12 @@ workpieces:
 
 robots:
   count: 4
-  offset_x: 2.0        # +X side of the belt
-  poses:               # per-robot DriveAPI targets [yaw, shoulder, elbow] deg
-    - [20, -40, 80]
-    - [-15, -55, 60]
-    - [30, -30, 90]
-    - [0, -50, 70]
+  offset_x: 1.8        # +X side of the belt (arms pitch toward -X to reach it)
+  poses:               # per-robot RETRACTED rest [yaw, shoulder, elbow] deg.
+    - [5, -20, 90]     # yaw ~0 keeps the reach in the X-Z plane (visible top-down);
+    - [-8, -18, 85]    # the pick animation extends toward the belt from here.
+    - [10, -22, 92]
+    - [0, -20, 88]
 
 racks:
   count: 3

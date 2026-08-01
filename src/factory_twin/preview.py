@@ -27,7 +27,11 @@ import matplotlib.patches as mpatches  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 from PIL import Image  # noqa: E402
-from pxr import Usd, UsdGeom  # noqa: E402
+from pxr import Gf, Usd, UsdGeom, UsdPhysics  # noqa: E402
+
+from . import kinematics  # noqa: E402
+
+_ARM_JOINTS = ("joint0_yaw", "joint1_shoulder", "joint2_elbow")
 
 # top-level group -> (colour, label). Order = draw order (back to front).
 GROUPS = {
@@ -61,6 +65,31 @@ def _draw_group(ax, stage, cache, group, color):
         ax.add_patch(mpatches.Rectangle(
             (lo[0], lo[1]), w, h, facecolor=color, edgecolor="white",
             linewidth=0.4, alpha=0.9))
+
+
+def _draw_arms(ax, stage, tc):
+    """Draw each robot arm as an FK skeleton at time `tc` (None = rest/default),
+    reading the joint drive targets and running forward kinematics so the arm
+    shows its *driven* pose top-down — the reach toward the belt."""
+    ws = stage.GetPrimAtPath("/World/Workstations")
+    if not ws:
+        return
+    color = GROUPS["/World/Workstations"][0]
+    tcode = Usd.TimeCode.Default() if tc is None else Usd.TimeCode(tc)
+    for root in ws.GetChildren():
+        mat = UsdGeom.Xformable(root).ComputeLocalToWorldTransform(tcode)
+        angles = []
+        for jn in _ARM_JOINTS:
+            jp = stage.GetPrimAtPath(root.GetPath().AppendChild(jn))
+            a = UsdPhysics.DriveAPI(jp, "angular").GetTargetPositionAttr().Get(tcode)
+            angles.append(float(a) if a is not None else 0.0)
+        world = [mat.Transform(Gf.Vec3d(float(p[0]), float(p[1]), float(p[2])))
+                 for p in kinematics.arm_fk(*angles)]
+        xs, ys = [w[0] for w in world], [w[1] for w in world]
+        ax.plot(xs, ys, "-", color=color, linewidth=2.5, alpha=0.95,
+                solid_capstyle="round")
+        ax.plot(xs[0], ys[0], "o", color=color, markersize=7)         # base
+        ax.plot(xs[-1], ys[-1], "s", color="#ffd9a6", markersize=5)   # gripper
 
 
 def _draw_amr_route(ax, stage):
@@ -100,8 +129,11 @@ def render(in_path: str, out_path: str) -> str:
                              [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
     fig, ax = plt.subplots(figsize=(7, 9))
     for group, (color, _) in GROUPS.items():
+        if group == "/World/Workstations":
+            continue  # drawn as FK skeletons below
         _draw_group(ax, stage, cache, group, color)
     _draw_amr_route(ax, stage)
+    _draw_arms(ax, stage, None)
     _setup_axes(ax, "Factory Digital Twin — top-down floor plan (metres)")
     _legend(ax)
     fig.tight_layout()
@@ -128,7 +160,8 @@ def render_animation(in_path: str, out_path: str, max_frames: int = 40) -> str:
 
     cache = UsdGeom.BBoxCache(Usd.TimeCode(start),
                              [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
-    static_groups = {g: c for g, (c, _) in GROUPS.items() if g != "/World/Workpieces"}
+    animated = {"/World/Workpieces", "/World/Workstations"}
+    static_groups = {g: c for g, (c, _) in GROUPS.items() if g not in animated}
 
     images = []
     for tc in frames:
@@ -137,8 +170,9 @@ def render_animation(in_path: str, out_path: str, max_frames: int = 40) -> str:
         for group, color in static_groups.items():
             _draw_group(ax, stage, cache, group, color)
         _draw_amr_route(ax, stage)
+        _draw_arms(ax, stage, tc)
         _draw_group(ax, stage, cache, "/World/Workpieces", GROUPS["/World/Workpieces"][0])
-        _setup_axes(ax, "Factory Digital Twin — conveyor flow")
+        _setup_axes(ax, "Factory Digital Twin — conveyor flow + robot picks")
         _legend(ax)
         fig.tight_layout()
         images.append(_fig_to_pil(fig))

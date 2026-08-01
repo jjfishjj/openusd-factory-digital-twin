@@ -23,6 +23,7 @@ Isaac Sim. A few loose dynamic parts drop onto the belt under gravity there too.
 from __future__ import annotations
 
 import argparse
+import math
 from pathlib import Path
 
 import yaml
@@ -96,6 +97,33 @@ def _drop_parts(stage, cfg, belt_top, m_drop):
         assets.bind(geo, m_drop)
 
 
+def _animate_arms(stage, cfg, n_frames):
+    """Author a pick-cycle trajectory on each arm's joint drives, phased per
+    robot. Yaw holds its base angle; shoulder and elbow swing so the gripper
+    reaches toward the belt and back. Keyframed every few frames; USD linearly
+    interpolates between them."""
+    rc = cfg["robots"]
+    poses = rc["poses"]
+    cycles = 2                 # pick cycles per conveyor loop
+    # from the retracted rest pose, reach toward the belt: shoulder pitches down
+    # and the elbow straightens so the forearm extends in -X.
+    amp1, amp2 = -60.0, -80.0  # shoulder / elbow deltas at full reach (deg)
+    key_step = max(1, n_frames // 24)
+
+    for i in range(rc["count"]):
+        base = f"/World/Workstations/Robot_{i:02d}"
+        yaw, sh, el = poses[i % len(poses)]
+        j0 = stage.GetPrimAtPath(f"{base}/joint0_yaw")
+        j1 = stage.GetPrimAtPath(f"{base}/joint1_shoulder")
+        j2 = stage.GetPrimAtPath(f"{base}/joint2_elbow")
+        physics.set_drive_target(j0, yaw)  # yaw constant (default sample)
+        for f in range(0, n_frames + 1, key_step):
+            u = f / n_frames + i / rc["count"]          # per-robot phase offset
+            s = (1 - math.cos(2 * math.pi * cycles * u)) / 2  # smooth 0→1→0
+            physics.set_drive_target(j1, sh + amp1 * s, time=f)
+            physics.set_drive_target(j2, el + amp2 * s, time=f)
+
+
 def build(cfg: dict, out_path: str) -> str:
     stage = Usd.Stage.CreateNew(out_path)
 
@@ -155,7 +183,9 @@ def build(cfg: dict, out_path: str) -> str:
             pose=poses[i % len(poses)])
         xf = UsdGeom.Xformable(root)
         xf.AddTranslateOp().Set(Gf.Vec3d(rc["offset_x"], y, 0))
-        xf.AddRotateZOp().Set(-90)  # face the belt
+        # no yaw on the root: the arm pitches in the world X-Z plane so its
+        # reach toward the belt (-X) is visible in the top-down preview.
+    _animate_arms(stage, cfg, n_frames)
 
     # --- storage racks: authored once, stamped as instanceable references ---
     proto = "/World/_Prototypes/Rack"
