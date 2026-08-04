@@ -10,8 +10,9 @@ conveyor:
   height: 0.8
 
 workpieces:
-  count: 6              # kinematic parts riding the belt
+  passthrough: 2       # background parts that ride the belt straight through
   speed: 2.5           # m/s along +Y (wraps at the end -> continuous flow)
+  # one additional "pick" part per robot is choreographed automatically
 
 robots:
   count: 4

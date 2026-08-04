@@ -38,6 +38,7 @@ GROUPS = {
     "/World/Floor": ("#33343d", "Floor"),
     "/World/Conveyor": ("#5a5c62", "Conveyor"),
     "/World/Racks": ("#3359bf", "Storage racks"),
+    "/World/Bins": ("#8a7248", "Output bins"),
     "/World/Workstations": ("#f28c1a", "Robot stations"),
     "/World/AMR": ("#e6d919", "AMR"),
     "/World/DropParts": ("#33b359", "Drop parts (physics)"),

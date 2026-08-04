@@ -23,13 +23,22 @@ Isaac Sim. A few loose dynamic parts drop onto the belt under gravity there too.
 from __future__ import annotations
 
 import argparse
-import math
 from pathlib import Path
 
 import yaml
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux
 
-from . import assets, physics
+from . import assets, kinematics, physics
+
+# ---------------------------------------------------------------------------
+# Arm pick-and-place cycle (shared by the arm drives AND the carried part, so
+# the grasp stays exact). Keyframes are (phase u, shoulder deg, elbow deg);
+# yaw is per-robot and added separately. FK-verified gripper targets:
+#   PICK  -> belt  (x≈0.1, z≈1.0)      PLACE -> +X bin (x≈3.5, z≈1.2)
+# ---------------------------------------------------------------------------
+_CYCLE = [(0.00, -20, 90), (0.20, -80, 10), (0.40, -20, 90),
+          (0.60, 70, 0), (0.80, -20, 90), (1.00, -20, 90)]
+_GRASP_U = (0.20, 0.60)  # the part is attached to the gripper over this window
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "config" / "factory.yaml"
 
@@ -49,33 +58,95 @@ def _add_amr_path(stage, path, points):
     return curve
 
 
-def _animate_workpieces(stage, cfg, belt_top, m_part):
-    """Kinematic parts riding the belt, driven by time samples so the flow loops
-    seamlessly. Returns the frame count authored."""
-    L = cfg["line"]["length"]
-    count = cfg["workpieces"]["count"]
+def _robot_y(cfg, i):
+    L, rc = cfg["line"]["length"], cfg["robots"]
+    return -L / 2 + (i + 0.5) * (L / rc["count"])
+
+
+def _pose_at(u):
+    """Piecewise-linear (shoulder, elbow) angle at cycle phase u∈[0,1]."""
+    for j in range(len(_CYCLE) - 1):
+        u0, a0, b0 = _CYCLE[j]
+        u1, a1, b1 = _CYCLE[j + 1]
+        if u0 <= u <= u1:
+            t = (u - u0) / (u1 - u0) if u1 > u0 else 0.0
+            return a0 + (a1 - a0) * t, b0 + (b1 - b0) * t
+    return _CYCLE[-1][1], _CYCLE[-1][2]
+
+
+def _cycle_u(cfg, i, f, n_frames):
+    """Cycle phase of robot i at frame f (one pick-place per loop, phased)."""
+    return (f / n_frames + i / cfg["robots"]["count"]) % 1.0
+
+
+def _gripper_world(cfg, i, u):
+    """World-space gripper tip of robot i at cycle phase u, via forward
+    kinematics on the SAME joint angles the arm drives use."""
+    yaw = cfg["robots"]["poses"][i % len(cfg["robots"]["poses"])][0]
+    q1, q2 = _pose_at(u)
+    tip = kinematics.arm_fk(yaw, q1, q2)[-1]
+    root = Gf.Matrix4d().SetTranslate(
+        Gf.Vec3d(cfg["robots"]["offset_x"], _robot_y(cfg, i), 0))
+    return root.Transform(Gf.Vec3d(float(tip[0]), float(tip[1]), float(tip[2])))
+
+
+def _passthrough_parts(stage, cfg, belt_top, m_part, n_frames):
+    """Background parts that ride the belt straight through, unpicked."""
+    L, fps = cfg["line"]["length"], cfg["animation"]["fps"]
     speed = cfg["workpieces"]["speed"]
-    fps = cfg["animation"]["fps"]
-
-    n_frames = max(1, round(fps * L / speed))  # exactly one belt-length per loop
-    stage.SetTimeCodesPerSecond(fps)
-    stage.SetStartTimeCode(0)
-    stage.SetEndTimeCode(n_frames)
-
-    UsdGeom.Xform.Define(stage, "/World/Workpieces")
+    count = cfg["workpieces"].get("passthrough", 0)
     for i in range(count):
-        body = UsdGeom.Xform.Define(stage, f"/World/Workpieces/Part_{i:02d}").GetPrim()
+        p = f"/World/Workpieces/Pass_{i:02d}"
+        body = UsdGeom.Xform.Define(stage, p).GetPrim()
         physics.make_kinematic_body(body, mass=2.0)
         trans = UsdGeom.Xformable(body).AddTranslateOp()
-        y0 = -L / 2 + i * (L / count)
+        y0 = -L / 2 + i * (L / max(1, count))
         for f in range(n_frames + 1):
-            y = _wrap(y0 + speed * (f / fps), L)
-            trans.Set(Gf.Vec3d(0, y, belt_top), time=f)
-        # collision/visual geometry (scale lives on the child, never on a body)
-        geo = assets.add_box(stage, f"/World/Workpieces/Part_{i:02d}/geo", (0.4, 0.4, 0.3))
+            trans.Set(Gf.Vec3d(0, _wrap(y0 + speed * (f / fps), L), belt_top), time=f)
+        geo = assets.add_box(stage, f"{p}/geo", (0.4, 0.4, 0.3))
         physics.add_collider(geo)
         assets.bind(geo, m_part)
-    return n_frames
+
+
+def _pick_parts(stage, cfg, belt_top, m_pick, m_bin, n_frames):
+    """One choreographed part per robot: ride the belt to the station, get
+    carried by the gripper (baked to follow the FK during the grasp window),
+    and settle into an output bin on the +X side. Kinematic, so the pick reads
+    identically in the GPU-free GIF and in Isaac Sim."""
+    rc = cfg["robots"]
+    part_step = max(1, n_frames // 60)
+    approach = 6.0  # metres of belt travel before the pickup
+    UsdGeom.Xform.Define(stage, "/World/Bins")
+    for i in range(rc["count"]):
+        y_i = _robot_y(cfg, i)
+        binpos = _gripper_world(cfg, i, _GRASP_U[1])  # release point = bin
+
+        # output bin on the floor beneath the release point
+        bin_geo = assets.add_box(stage, f"/World/Bins/Bin_{i:02d}",
+                                 (0.8, 0.8, 0.9),
+                                 translate=(binpos[0], y_i, 0.45))
+        physics.make_static_collider(bin_geo)
+        assets.bind(bin_geo, m_bin)
+
+        # the picked part
+        p = f"/World/Workpieces/Pick_{i:02d}"
+        body = UsdGeom.Xform.Define(stage, p).GetPrim()
+        physics.make_kinematic_body(body, mass=2.0)
+        trans = UsdGeom.Xformable(body).AddTranslateOp()
+        for f in range(0, n_frames + 1, part_step):
+            u = _cycle_u(cfg, i, f, n_frames)
+            if u < _GRASP_U[0]:                       # riding the belt to the arm
+                frac = u / _GRASP_U[0]
+                pos = Gf.Vec3d(0.1, y_i - (1 - frac) * approach, belt_top)
+            elif u <= _GRASP_U[1]:                    # grasped: follow the gripper
+                g = _gripper_world(cfg, i, u)
+                pos = Gf.Vec3d(g[0], g[1], g[2] - 0.05)
+            else:                                     # released: rest in the bin
+                pos = Gf.Vec3d(binpos[0], binpos[1], 1.0)
+            trans.Set(pos, time=f)
+        geo = assets.add_box(stage, f"{p}/geo", (0.35, 0.35, 0.3))
+        physics.add_collider(geo)
+        assets.bind(geo, m_pick)
 
 
 def _drop_parts(stage, cfg, belt_top, m_drop):
@@ -98,30 +169,21 @@ def _drop_parts(stage, cfg, belt_top, m_drop):
 
 
 def _animate_arms(stage, cfg, n_frames):
-    """Author a pick-cycle trajectory on each arm's joint drives, phased per
-    robot. Yaw holds its base angle; shoulder and elbow swing so the gripper
-    reaches toward the belt and back. Keyframed every few frames; USD linearly
-    interpolates between them."""
+    """Author the pick-and-place trajectory on each arm's shoulder/elbow drives,
+    from the shared _CYCLE keyframes and phased per robot. Yaw stays constant.
+    This is the same joint schedule the carried part follows via FK."""
     rc = cfg["robots"]
-    poses = rc["poses"]
-    cycles = 2                 # pick cycles per conveyor loop
-    # from the retracted rest pose, reach toward the belt: shoulder pitches down
-    # and the elbow straightens so the forearm extends in -X.
-    amp1, amp2 = -60.0, -80.0  # shoulder / elbow deltas at full reach (deg)
-    key_step = max(1, n_frames // 24)
-
+    key_step = max(1, n_frames // 48)
     for i in range(rc["count"]):
         base = f"/World/Workstations/Robot_{i:02d}"
-        yaw, sh, el = poses[i % len(poses)]
-        j0 = stage.GetPrimAtPath(f"{base}/joint0_yaw")
+        yaw = rc["poses"][i % len(rc["poses"])][0]
+        physics.set_drive_target(stage.GetPrimAtPath(f"{base}/joint0_yaw"), yaw)
         j1 = stage.GetPrimAtPath(f"{base}/joint1_shoulder")
         j2 = stage.GetPrimAtPath(f"{base}/joint2_elbow")
-        physics.set_drive_target(j0, yaw)  # yaw constant (default sample)
         for f in range(0, n_frames + 1, key_step):
-            u = f / n_frames + i / rc["count"]          # per-robot phase offset
-            s = (1 - math.cos(2 * math.pi * cycles * u)) / 2  # smooth 0→1→0
-            physics.set_drive_target(j1, sh + amp1 * s, time=f)
-            physics.set_drive_target(j2, el + amp2 * s, time=f)
+            q1, q2 = _pose_at(_cycle_u(cfg, i, f, n_frames))
+            physics.set_drive_target(j1, q1, time=f)
+            physics.set_drive_target(j2, q2, time=f)
 
 
 def build(cfg: dict, out_path: str) -> str:
@@ -148,7 +210,9 @@ def build(cfg: dict, out_path: str) -> str:
     m_rack = assets.create_material(stage, f"{mats}/Rack", (0.2, 0.35, 0.75), roughness=0.6)
     m_amr = assets.create_material(stage, f"{mats}/AMR", (0.9, 0.85, 0.1), roughness=0.5)
     m_part = assets.create_material(stage, f"{mats}/Part", (0.8, 0.2, 0.2), roughness=0.4)
+    m_pick = assets.create_material(stage, f"{mats}/Pick", (0.85, 0.5, 0.85), roughness=0.4)
     m_drop = assets.create_material(stage, f"{mats}/Drop", (0.2, 0.7, 0.35), roughness=0.5)
+    m_bin = assets.create_material(stage, f"{mats}/Bin", (0.35, 0.3, 0.22), roughness=0.8)
 
     # --- physics scene + ground collider ---
     physics.setup_physics_scene(stage).CreateGravityMagnitudeAttr(cfg["physics"]["gravity"])
@@ -167,8 +231,17 @@ def build(cfg: dict, out_path: str) -> str:
             assets.bind(child, m_belt)
             physics.make_static_collider(child)
 
-    # --- animated + dynamic parts ---
-    n_frames = _animate_workpieces(stage, cfg, belt_top, m_part)
+    # --- timeline metadata (one conveyor loop = one belt-length of travel) ---
+    fps = cfg["animation"]["fps"]
+    n_frames = max(1, round(fps * L / cfg["workpieces"]["speed"]))
+    stage.SetTimeCodesPerSecond(fps)
+    stage.SetStartTimeCode(0)
+    stage.SetEndTimeCode(n_frames)
+
+    # --- parts: background flow, choreographed picks (+ bins), and drops ---
+    UsdGeom.Xform.Define(stage, "/World/Workpieces")
+    _passthrough_parts(stage, cfg, belt_top, m_part, n_frames)
+    _pick_parts(stage, cfg, belt_top, m_pick, m_bin, n_frames)
     _drop_parts(stage, cfg, belt_top, m_drop)
 
     # --- robot-arm articulations along the +X side ---

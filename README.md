@@ -11,11 +11,12 @@ for real CAD assets and lit with RTX path tracing.
 
 ![Conveyor flow animation](output/conveyor.gif)
 
-*Conveyor flow **and staggered robot picks**, rendered GPU-free straight from the
-USD. Orange = robot arms drawn by forward kinematics from their time-sampled
-joint drive targets (reaching toward the belt and retracting); red = kinematic
-workpieces riding the belt; green = dynamic parts that drop in Isaac Sim; blue =
-instanced racks; yellow = AMR + route.*
+*Closed-loop **pick-and-place**, rendered GPU-free straight from the USD. Each
+arm (orange, drawn by forward kinematics from its time-sampled joint drives)
+picks a part off the belt and sets it in an output bin, staggered across the four
+stations. Red = workpieces (riding the belt, then carried to the tan bins);
+green = dynamic parts that drop in Isaac Sim; blue = instanced racks; yellow =
+AMR + route.*
 
 ![Factory floor plan](output/floorplan.png)
 
@@ -78,6 +79,24 @@ link2  (forearm + gripper)
 > angles to draw the driven pose. Both read one source of truth — the drive
 > targets — so the preview matches what PhysX produces.
 
+## Closed-loop pick-and-place
+
+Each arm runs a full pick cycle: a part rides the belt to the station, the arm
+picks it up, carries it, and sets it in an output bin on the +X side — the four
+stations phased so they work in sequence.
+
+The grasp is a **baked kinematic pick**: the picked part is a kinematic body
+whose transform is time-sampled to (1) ride the belt, (2) **follow the gripper**
+during the grasp window — sampled from the *same* forward kinematics the arm
+uses, so the part stays exactly in the hand — and (3) rest in the bin. Because
+it is kinematic, the pick plays identically in the GPU-free GIF and in Isaac Sim.
+
+> **Why baked, not a contact grasp:** USD has no time-varying parenting, and a
+> physics joint cannot be created/destroyed on the timeline from static USD —
+> true contact-based grasping (attach/detach when the gripper touches the part)
+> needs an Isaac Sim runtime script (a `SurfaceGripper` or a scripted joint).
+> That is the natural next step; here the pick is authored and solver-independent.
+
 Verify the rigging without a GPU:
 
 ```bash
@@ -91,7 +110,8 @@ print('articulations', sum(p.HasAPI(P.ArticulationRootAPI) for p in s.Traverse()
 | Asset | Count | Notes |
 |-------|-------|-------|
 | Conveyor belt | 1 | 20 m, runs along +Y (material-flow direction), collider bed |
-| Workpieces | 6 | **kinematic** parts, time-sampled flow along the belt |
+| Pass-through parts | 2 | **kinematic** parts, time-sampled flow along the belt |
+| Pick parts + bins | 4 + 4 | **picked** off the belt by an arm and placed in an output bin |
 | Drop parts | 3 | **dynamic** rigid bodies that fall onto the belt in Isaac Sim |
 | Robot-arm workstations | 4 | 3-DOF **UsdPhysics articulations**, along the +X side |
 | Storage racks | 3 | `instanceable` — 3 bays × 3 levels each |
@@ -149,8 +169,9 @@ output/            # generated .usda / .usdc (git-ignored) + sample PNG/GIF (tra
 - [x] Parameterise the whole layout from a YAML config
 - [x] Conveyor + workpieces as physics bodies (kinematic parts ride, dynamic parts drop)
 - [x] Drive the robot joints on a timeline (time-sampled drive targets + FK preview)
+- [x] Closed-loop pick-and-place: arms pick parts off the belt into output bins
 - [ ] A proper 3D isometric preview (currently top-down only)
-- [ ] Close the loop: pick a workpiece when an arm reaches it (attach/detach)
+- [ ] Contact-based grasp in Isaac Sim (SurfaceGripper / scripted attach-detach)
 
 ## Requirements
 
