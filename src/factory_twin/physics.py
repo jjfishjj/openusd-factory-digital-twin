@@ -32,10 +32,25 @@ _IDENTITY = Gf.Quatf(1.0, 0.0, 0.0, 0.0)
 # Stage-level physics
 # ---------------------------------------------------------------------------
 def setup_physics_scene(stage, path="/World/PhysicsScene"):
-    """Author the global physics scene: Earth gravity along -Z."""
+    """Author the global physics scene: Earth gravity along -Z, CCD on.
+
+    Continuous collision detection has to be enabled scene-wide as well as
+    per-body. Without it PhysX only tests for contact at discrete timesteps, so
+    a fast body can pass straight through thin geometry between two steps. The
+    drop parts reach ~7.7 m/s by the time they arrive at the 0.1 m floor slab,
+    which is 0.13 m of travel per 1/60 s step — wider than the slab. Verified on
+    an L40S: without this flag all three drop parts tunnel through the floor.
+
+    The PhysX schemas are authored by name (AddAppliedSchema plus plain
+    attributes) rather than through PhysxSchema, so building the scene still
+    only needs `usd-core` — no Omniverse install.
+    """
     scene = UsdPhysics.Scene.Define(stage, path)
     scene.CreateGravityDirectionAttr(Gf.Vec3f(0, 0, -1))
     scene.CreateGravityMagnitudeAttr(9.81)
+    prim = scene.GetPrim()
+    prim.AddAppliedSchema("PhysxSceneAPI")
+    prim.CreateAttribute("physxScene:enableCCD", Sdf.ValueTypeNames.Bool).Set(True)
     return scene
 
 
@@ -64,13 +79,60 @@ def make_kinematic_body(prim, mass=2.0):
     return prim
 
 
-def make_dynamic_body(prim, mass=2.0):
+def make_dynamic_body(prim, mass=2.0, ccd=True):
     """A free dynamic rigid body — falls under gravity, collides, comes to rest.
     Used for the loose parts that drop onto the belt in Isaac Sim.
-    Apply add_collider() to its child geometry to give it a collision shape."""
+    Apply add_collider() to its child geometry to give it a collision shape.
+
+    `ccd` enables continuous collision detection on this body; see
+    setup_physics_scene() for why the drop parts need it."""
     UsdPhysics.RigidBodyAPI.Apply(prim)
     UsdPhysics.MassAPI.Apply(prim).CreateMassAttr(mass)
+    if ccd:
+        prim.AddAppliedSchema("PhysxRigidBodyAPI")
+        prim.CreateAttribute("physxRigidBody:enableCCD",
+                             Sdf.ValueTypeNames.Bool).Set(True)
     return prim
+
+
+def isolate_choreographed_parts(stage, choreographed, simulated,
+                               root="/World/CollisionGroups"):
+    """Stop the kinematic, time-sampled parts from fighting the solver.
+
+    The workpieces are kinematic bodies, which PhysX treats as infinitely
+    massive: whatever they touch loses the argument. Measured in Isaac Sim 5.1
+    on an L40S, that costs the scene twice.
+
+      * A pick part is authored *inside* the gripper for the carry - that is
+        what a baked grasp is - so at frame 0 it shoves Robot_01 and Robot_02
+        off their commanded rest pose by 8.8 and 20.6 degrees. Robots 00 and
+        03, whose pick parts are elsewhere at frame 0, hold to 0.02 degrees.
+        Deactivating /World/Workpieces drops the worst error to 0.4 degrees;
+        deactivating any other group changes nothing.
+      * A pass-through part wraps from the end of the belt back to the start in
+        a single frame - 20 m in 1/24 s - and launches whatever is resting on
+        the belt down the line. The drop parts land correctly at z = 1.05 and
+        sit there for about a second before being swept 30-56 m along +Y, past
+        the edge of the floor.
+
+    Filtering the choreographed parts against the simulated ones removes both.
+    They still collide with the floor and the belt, so they stay physical
+    scenery; they just no longer win arguments with the robots.
+
+    This is a scene-authoring fix, not a physical one. The honest fix for the
+    grasp is a contact gripper driven by an Isaac Sim runtime script (a
+    SurfaceGripper), where the arm really does carry the part. Until then this
+    keeps the authored choreography and the physics from corrupting each other.
+    """
+    UsdGeom.Scope.Define(stage, root)
+    g_chor = UsdPhysics.CollisionGroup.Define(stage, f"{root}/Choreographed")
+    g_sim = UsdPhysics.CollisionGroup.Define(stage, f"{root}/Simulated")
+    for path in choreographed:
+        g_chor.GetCollidersCollectionAPI().CreateIncludesRel().AddTarget(path)
+    for path in simulated:
+        g_sim.GetCollidersCollectionAPI().CreateIncludesRel().AddTarget(path)
+    g_chor.CreateFilteredGroupsRel().SetTargets([g_sim.GetPath()])
+    return g_chor, g_sim
 
 
 # ---------------------------------------------------------------------------

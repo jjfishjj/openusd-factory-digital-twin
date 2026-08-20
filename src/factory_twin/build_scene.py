@@ -260,6 +260,15 @@ def build(cfg: dict, out_path: str) -> str:
         # reach toward the belt (-X) is visible in the top-down preview.
     _animate_arms(stage, cfg, n_frames)
 
+    # The choreographed parts are kinematic, so in PhysX they would shove the
+    # arms and bulldoze the drop parts. Filter them against the simulated
+    # bodies; see physics.isolate_choreographed_parts for the measurements.
+    physics.isolate_choreographed_parts(
+        stage,
+        choreographed=["/World/Workpieces"],
+        simulated=["/World/Workstations", "/World/DropParts"],
+    )
+
     # --- storage racks: authored once, stamped as instanceable references ---
     proto = "/World/_Prototypes/Rack"
     UsdGeom.Scope.Define(stage, "/World/_Prototypes")

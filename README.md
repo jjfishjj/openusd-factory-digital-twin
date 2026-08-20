@@ -4,7 +4,9 @@ A procedurally-generated **factory production-line digital twin** built with
 [OpenUSD](https://openusd.org) (Pixar's Universal Scene Description — the format
 at the core of **NVIDIA Omniverse**).
 
-Pure Python, no GPU required. It runs anywhere `usd-core` installs (incl. macOS)
+Pure Python, no GPU required to *build*; validated in Isaac Sim on an L40S
+(see [Verified in real PhysX](#verified-in-real-physx)).
+It runs anywhere `usd-core` installs (incl. macOS)
 and emits a `.usd` scene that opens directly in Omniverse / USD Composer /
 Isaac Sim on any RTX machine, where the placeholder primitives can be swapped
 for real CAD assets and lit with RTX path tracing.
@@ -104,6 +106,35 @@ PYTHONPATH=src python -c "from pxr import Usd,UsdPhysics as P; s=Usd.Stage.Open(
 print('articulations', sum(p.HasAPI(P.ArticulationRootAPI) for p in s.Traverse()), \
 'revolute joints', sum(p.IsA(P.RevoluteJoint) for p in s.Traverse()))"
 ```
+
+## Verified in real PhysX
+
+That check reads the file. To find out what a solver actually *does* with it,
+the scene was run headless in **Isaac Sim 5.1** on an **NVIDIA L40S**
+(`g6e.xlarge` on [NVIDIA Brev](https://brev.nvidia.com)) — see
+[`brev/`](brev/) for the harness, the full method, and the report.
+
+| Measured under PhysX | |
+|---|---|
+| Articulation roots parsed | **4 / 4**, 3 DOF each |
+| Drive targets outside a joint limit | **0** |
+| Shoulder travel on the timeline | **141.0°** (authored range 145.6°) |
+| Elbow travel on the timeline | **85.2°** |
+| Steady-state tracking lag | **4.8–5.4°** |
+| Arms holding their authored rest pose | **0.409°** worst |
+| Drop parts at rest | **z = 1.05 m**, exactly belt top + half extent |
+
+So the claim above — that the arms reach toward the belt and retract on the
+timeline in Isaac Sim — is measured, not assumed.
+
+It did not pass the first time. The solver found a real bug that authoring
+alone cannot surface: the **kinematic** workpieces were shoving the arms off
+their commanded pose by up to **20.6°** and bulldozing the drop parts 30–56 m
+down the line, because a baked grasp authors the carried part *inside* the
+gripper and PhysX treats a kinematic body as infinitely massive. An ablation
+pass named the cause, and filtering those parts into their own
+`UsdPhysics.CollisionGroup` fixed it. The write-up in [`brev/`](brev/) has the
+numbers, the two wrong hypotheses that came first, and what refuted them.
 
 ## Scene contents
 
