@@ -1,0 +1,10 @@
+theme: jekyll-theme-cayman
+title: openusd factory digital twin
+description: >-
+  Procedurally-generated factory production-line digital twin in OpenUSD (NVIDIA Omniverse-ready, runs GPU-free)
+exclude:
+  - venv
+  - node_modules
+  - "*.py"
+  - "*.usda"
+  - requirements.txt
