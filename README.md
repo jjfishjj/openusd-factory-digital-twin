@@ -120,9 +120,10 @@ the scene was run headless in **Isaac Sim 5.1** on an **NVIDIA L40S**
 | Drive targets outside a joint limit | **0** |
 | Shoulder travel on the timeline | **141.0°** (authored range 145.6°) |
 | Elbow travel on the timeline | **85.2°** |
-| Steady-state tracking lag | **4.8–5.4°** |
+| Steady-state tracking lag | max **5.50°**, mean 5.27° |
 | Arms holding their authored rest pose | **0.409°** worst |
 | Drop parts at rest | **z = 1.05 m**, exactly belt top + half extent |
+| Checks passed | **12 / 12** |
 
 So the claim above — that the arms reach toward the belt and retract on the
 timeline in Isaac Sim — is measured, not assumed.

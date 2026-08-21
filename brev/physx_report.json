@@ -1,0 +1,387 @@
+{
+  "stage": "/workspace/home/ubuntu/factory-twin/output/factory_twin.usda",
+  "physics_dt": 0.008333333333333333,
+  "static": {
+    "authored_tps": 24.0,
+    "articulation_roots": 4,
+    "revolute_joints": 12,
+    "rigid_bodies": 25,
+    "colliders": 35,
+    "driven_joints": 12,
+    "animated_drives": 8,
+    "static_drives": 4,
+    "limit_violations": [],
+    "scene_ccd_enabled": true,
+    "bodies_with_ccd": 3,
+    "gravity": {
+      "direction": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "magnitude": 9.8100004196167
+    },
+    "up_axis": "Z",
+    "meters_per_unit": 1.0
+  },
+  "runtime": {
+    "articulations_found": 4,
+    "dof_per_articulation": 3,
+    "dof_names": [
+      "joint0_yaw",
+      "joint1_shoulder",
+      "joint2_elbow"
+    ],
+    "drop_bodies_found": 3
+  },
+  "phase1_dynamics": {
+    "settle_seconds": 5.0,
+    "belt_top_m": 0.875,
+    "floor_top_m": 0.0,
+    "part_half_extent_m": 0.175,
+    "expected_rest_z_on_belt": 1.05,
+    "expected_rest_z_on_floor": 0.175,
+    "bodies": [
+      {
+        "body": 0,
+        "xy_start": [
+          0.0,
+          -5.0
+        ],
+        "xy_end": [
+          0.0,
+          -5.0
+        ],
+        "z_start": 3.023,
+        "z_end": 1.05,
+        "dz": -1.973,
+        "residual_1s": 0.0,
+        "rest_levels": [
+          {
+            "z": 1.05,
+            "from_s": 0.625,
+            "to_s": 5.0
+          }
+        ]
+      },
+      {
+        "body": 1,
+        "xy_start": [
+          0.0,
+          0.0
+        ],
+        "xy_end": [
+          0.0,
+          0.0
+        ],
+        "z_start": 3.023,
+        "z_end": 1.05,
+        "dz": -1.973,
+        "residual_1s": 0.0,
+        "rest_levels": [
+          {
+            "z": 1.05,
+            "from_s": 0.625,
+            "to_s": 5.0
+          }
+        ]
+      },
+      {
+        "body": 2,
+        "xy_start": [
+          0.0,
+          5.0
+        ],
+        "xy_end": [
+          0.0,
+          5.0
+        ],
+        "z_start": 3.023,
+        "z_end": 1.05,
+        "dz": -1.973,
+        "residual_1s": 0.0,
+        "rest_levels": [
+          {
+            "z": 1.05,
+            "from_s": 0.625,
+            "to_s": 5.0
+          }
+        ]
+      }
+    ],
+    "all_fell": true,
+    "all_above_floor": true,
+    "all_at_rest": true,
+    "residual_after_settle_m": 0.0
+  },
+  "phase2a_hold": {
+    "hold_seconds": 2.0,
+    "max_steady_state_error_deg": 0.4092,
+    "mean_steady_state_error_deg": 0.1314,
+    "per_robot_deg": {
+      "Robot_00": {
+        "joint0_yaw": 0.0001,
+        "joint1_shoulder": 0.0207,
+        "joint2_elbow": 0.0173
+      },
+      "Robot_01": {
+        "joint0_yaw": 0.0002,
+        "joint1_shoulder": 0.0413,
+        "joint2_elbow": 0.044
+      },
+      "Robot_02": {
+        "joint0_yaw": 0.0002,
+        "joint1_shoulder": 0.4092,
+        "joint2_elbow": 0.2879
+      },
+      "Robot_03": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 0.3797,
+        "joint2_elbow": 0.3765
+      }
+    },
+    "ablation_worst_error_deg": {
+      "/World/DropParts": 0.409,
+      "/World/Workpieces": 0.409,
+      "/World/Bins": 0.409,
+      "/World/Racks": 0.409,
+      "/World/Conveyor": 0.409,
+      "/World/AMR": 0.409
+    },
+    "culprit": []
+  },
+  "phase2b_tracking": {
+    "method": "timeline playback - Isaac Sim reads the authored drive time samples",
+    "timeline_reached_s": 8.0,
+    "timeline_end_s": 8.0,
+    "settle_window_s": 0.5,
+    "samples": [
+      {
+        "frame": 0,
+        "t_s": 0.017,
+        "in_steady_window": false,
+        "target_deg_robot0": [
+          5.0,
+          -20.62,
+          89.17
+        ],
+        "achieved_deg_robot0": [
+          1.1,
+          -4.5,
+          19.82
+        ],
+        "max_lag_deg": 69.348
+      },
+      {
+        "frame": 24,
+        "t_s": 0.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          -56.88,
+          40.83
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          -53.27,
+          45.63
+        ],
+        "max_lag_deg": 4.802
+      },
+      {
+        "frame": 48,
+        "t_s": 1.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          -65.62,
+          29.17
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          -68.98,
+          24.62
+        ],
+        "max_lag_deg": 5.408
+      },
+      {
+        "frame": 72,
+        "t_s": 2.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          -28.12,
+          79.17
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          -31.72,
+          74.37
+        ],
+        "max_lag_deg": 4.801
+      },
+      {
+        "frame": 96,
+        "t_s": 3.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          24.06,
+          45.94
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          18.67,
+          51.33
+        ],
+        "max_lag_deg": 5.408
+      },
+      {
+        "frame": 120,
+        "t_s": 4.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          59.69,
+          10.31
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          63.09,
+          6.94
+        ],
+        "max_lag_deg": 4.801
+      },
+      {
+        "frame": 144,
+        "t_s": 5.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          3.44,
+          66.56
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          8.85,
+          61.16
+        ],
+        "max_lag_deg": 5.408
+      },
+      {
+        "frame": 168,
+        "t_s": 6.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          -20.0,
+          90.0
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          -19.97,
+          89.98
+        ],
+        "max_lag_deg": 4.801
+      },
+      {
+        "frame": 192,
+        "t_s": 7.983,
+        "in_steady_window": true,
+        "target_deg_robot0": [
+          5.0,
+          -20.0,
+          90.0
+        ],
+        "achieved_deg_robot0": [
+          5.0,
+          -20.0,
+          90.0
+        ],
+        "max_lag_deg": 5.408
+      }
+    ],
+    "startup_convergence_peak_deg": 69.348,
+    "max_lag_deg": 5.504,
+    "mean_lag_deg": 5.275,
+    "p95_lag_deg": 5.41,
+    "max_lag_including_startup_deg": 69.348
+  },
+  "phase2c_motion": {
+    "window": "t >= 0.5s",
+    "joint_travel_deg": {
+      "Robot_00": {
+        "joint0_yaw": 0.04,
+        "joint1_shoulder": 140.91,
+        "joint2_elbow": 85.22
+      },
+      "Robot_01": {
+        "joint0_yaw": 0.06,
+        "joint1_shoulder": 140.98,
+        "joint2_elbow": 85.22
+      },
+      "Robot_02": {
+        "joint0_yaw": 0.07,
+        "joint1_shoulder": 141.04,
+        "joint2_elbow": 85.23
+      },
+      "Robot_03": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 140.99,
+        "joint2_elbow": 85.22
+      }
+    },
+    "final_error_deg": {
+      "Robot_00": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 0.003,
+        "joint2_elbow": 0.0
+      },
+      "Robot_01": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 3.398,
+        "joint2_elbow": 4.586
+      },
+      "Robot_02": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 5.393,
+        "joint2_elbow": 5.397
+      },
+      "Robot_03": {
+        "joint0_yaw": 0.0,
+        "joint1_shoulder": 5.408,
+        "joint2_elbow": 5.401
+      }
+    },
+    "animated_joints_moved": true,
+    "static_joints_return_to_target": true,
+    "static_joint_peak_deflection_deg": 0.07
+  },
+  "findings": [
+    {
+      "what": "yaw turntable deflection under pick-cycle reaction torque",
+      "value_deg": 0.07,
+      "note": "joint0_yaw holds a static drive target, but the shoulder and elbow swinging through the cycle push the turntable off target by this much before it recovers. Raising the yaw drive stiffness above the shared 1e5 would reduce it."
+    },
+    {
+      "what": "startup convergence from the authored rest pose",
+      "value_deg": 69.348,
+      "note": "the USD stores the arms at the zero pose and the motion in the drive targets, so the solver has to travel to the frame-0 pose when playback starts. Excluded from the tracking statistic."
+    }
+  ],
+  "verdict": {
+    "4 articulation roots parsed by PhysX": true,
+    "3 DOF per arm registered": true,
+    "no drive target exceeds a joint limit": true,
+    "CCD enabled (scene + bodies)": true,
+    "dynamic parts fall under gravity": true,
+    "dynamic parts stay above the floor": true,
+    "dynamic parts come to rest": true,
+    "arms hold their authored rest pose (<1 deg)": true,
+    "timeline played to the end": true,
+    "steady-state tracking lag acceptable (<10 deg)": true,
+    "animated joints actually move": true,
+    "static joints return to their target (<1 deg)": true
+  },
+  "passed": true
+}

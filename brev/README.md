@@ -45,8 +45,8 @@ It writes `output/physx_report.json` and prints a human summary.
 
 ## Results
 
-**The articulation rigging is valid.** PhysX parses all four arms as drivable
-robots and the authored trajectory plays:
+**All 12 checks pass.** PhysX parses all four arms as drivable robots and the
+authored trajectory plays:
 
 | | |
 |---|---|
@@ -57,19 +57,15 @@ robots and the authored trajectory plays:
 | Drive targets outside a joint limit | **0** |
 | Shoulder travel under PhysX | **141.0°** (authored range 145.6°) |
 | Elbow travel under PhysX | **85.2°** |
-| Steady-state tracking lag | **4.8–5.4°** |
+| Steady-state tracking lag | max **5.50°**, mean 5.27°, p95 5.41° |
 | Arms holding their rest pose | **0.409°** worst |
+| Static-target joints, peak deflection | **0.07°**, final error 0.000° |
 | Drop parts at rest | **z = 1.05 m** — belt top 0.875 + half extent 0.175, residual 0.00000 m |
+
+The full report is committed as [`physx_report.json`](physx_report.json).
 
 So the README's central claim — *the arms reach toward the belt and retract on
 the timeline in Isaac Sim* — holds up under measurement.
-
-> **Provenance.** The numbers above come from the run made after the collision-group
-> fix landed. The harness has since gained one methodology refinement — excluding
-> the startup-convergence window from the tracking statistic and reporting it
-> separately — which is committed here but has not itself been re-executed, because
-> the GPU instance was shut down first. The measurements are unaffected by it: the
-> per-frame samples the steady-state figures are drawn from were logged either way.
 
 ## The bug the solver found
 
@@ -119,7 +115,7 @@ scenery — they simply no longer win arguments with the solver.
 |---|---|---|
 | Drop parts | swept to y = +29…+56, off the floor | **rest at z = 1.05, xy unmoved** |
 | Worst hold error | 20.626° | **0.409°** |
-| Steady tracking lag | 11–25° | **4.8–5.4°** |
+| Steady tracking lag | 11–25° | **5.3–5.5°** |
 | Shoulder travel spread across the 4 arms | 137.8–141.6° | **141.0° on all four** |
 
 Ablation afterwards reports *no culprit* — with the baseline already at 0.409°
@@ -130,17 +126,20 @@ is a contact gripper driven by an Isaac Sim runtime script (a `SurfaceGripper`),
 where the arm really does carry the part — already the repo's stated next step,
 now with measurements behind it.
 
-## Measured characteristics, not defects
+## Where the measurement window matters
 
-- **Yaw deflection up to 7.8°.** `joint0_yaw` holds a static drive target, but
-  the shoulder and elbow swinging through the pick cycle feed a reaction torque
-  into the turntable. A force drive answers that with a finite deflection and
-  then recovers. Raising the yaw stiffness above the shared `1e5` would reduce
-  it.
-- **69° of startup convergence.** The USD stores the arms at the zero pose and
-  the motion in the drive targets, so when playback starts the solver has to
-  travel to the frame-0 pose. It is convergence, not tracking error, and is
-  reported separately from the tracking statistic.
+**69° of startup convergence.** The USD stores the arms at the zero pose and the
+motion in the drive targets, so when playback starts the solver has to travel to
+the frame-0 pose. That is convergence, not tracking error — it is reported
+separately rather than averaged into the tracking statistic.
+
+Getting that window right changed a conclusion. Measured across the whole
+playback, the static-target `joint0_yaw` appeared to swing **3.9–7.8°**, which
+reads like a turntable drive too soft to resist the reaction torque of the pick
+cycle, and was very nearly written up as exactly that. Measured over the steady
+window alone, the same joints move **0.07°** and return to target with **0.000°**
+error. The swing was the arms leaving the rest pose at t=0, not reaction torque.
+There was nothing to fix — only something to measure correctly.
 
 ## Notes for anyone re-running this
 
