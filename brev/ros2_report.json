@@ -1,0 +1,31 @@
+{
+  "topics": {
+    "/factory/joint_states": "sensor_msgs/JointState",
+    "/factory/amr_route": "nav_msgs/Path",
+    "/clock": "rosgraph_msgs/Clock"
+  },
+  "joint_names": [
+    "robot_00_joint0_yaw",
+    "robot_00_joint1_shoulder",
+    "robot_00_joint2_elbow",
+    "robot_01_joint0_yaw",
+    "robot_01_joint1_shoulder",
+    "robot_01_joint2_elbow",
+    "robot_02_joint0_yaw",
+    "robot_02_joint1_shoulder",
+    "robot_02_joint2_elbow",
+    "robot_03_joint0_yaw",
+    "robot_03_joint1_shoulder",
+    "robot_03_joint2_elbow"
+  ],
+  "n_joints": 12,
+  "route_vertices": 5,
+  "rate_hz": 30.0,
+  "seconds": 420.0,
+  "published": {
+    "joint_states": 12600,
+    "clock": 12600,
+    "amr_route": 413
+  },
+  "rclpy_from": "/root/isaacsim/exts/isaacsim.ros2.bridge/jazzy/rclpy"
+}

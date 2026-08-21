@@ -239,6 +239,70 @@ configuration that reaches 6/8, and the checks that fail are reported as failing
 
 Full run in [`contact_grasp_report.json`](contact_grasp_report.json).
 
+## ROS 2: making the nav-stack claim true
+
+The root README says the AMR route is authored as a first-class `BasisCurves`
+path rather than a baked mesh, "so a nav stack can consume it". `ros2_bridge.py`
+makes good on that - the curve is read off the stage and published as a
+`nav_msgs/Path`, which is the message a nav stack subscribes to. Alongside it the
+four articulations stream `sensor_msgs/JointState` while the authored timeline
+plays, and simulation time goes out on `/clock`.
+
+```bash
+export LD_LIBRARY_PATH=/root/isaacsim/exts/isaacsim.ros2.bridge/jazzy/lib:$LD_LIBRARY_PATH
+/root/isaacsim/python.sh ros2_bridge.py --seconds 420
+# then, from another shell in the container:
+bash verify_ros2.sh
+```
+
+### Verified from outside the simulator
+
+`verify_ros2.sh` deliberately uses the **system** `ros2` CLI - a different Python
+(3.12 against Isaac's 3.11) and a different rclpy - so the check crosses a real
+DDS boundary rather than the simulator confirming itself.
+
+```
+$ ros2 topic list
+/clock
+/factory/amr_route
+/factory/joint_states
+
+$ ros2 topic type /factory/joint_states
+sensor_msgs/msg/JointState
+
+$ ros2 topic echo /factory/joint_states --once
+frame_id: factory_world
+name: [robot_00_joint0_yaw, robot_00_joint1_shoulder, robot_00_joint2_elbow,
+       robot_01_joint0_yaw, ... robot_03_joint2_elbow]     # 12 joints
+position: [0.0873, -0.3489, 1.5708, -0.1396, -1.2934, ...]
+velocity: [2.09e-06, -0.00208, -6.09e-07, 3.85e-06, -0.4297, ...]
+
+$ ros2 topic hz /factory/joint_states --window 40
+average rate: 31.803
+
+$ ros2 topic type /factory/amr_route
+nav_msgs/msg/Path
+```
+
+The published route reads back as the geometry the config asks for -
+`(-2.2, -10, 0.02) -> (-2.2, 10, 0.02) -> (-4.5, 10, 0.02) -> ...`, matching
+`amr.offset_x = -2.2`, `racks.offset_x = -4.5` and a 20 m line. The velocities
+in the joint state are non-zero because the arms really are mid-cycle: this is
+the twin's live state, not a canned message.
+
+### The one real obstacle
+
+`import rclpy` fails inside Isaac Sim, twice over. The system ROS 2 Jazzy is
+built for Python 3.12 and Isaac runs 3.11, so the system rclpy cannot be
+imported at all; and the copy the bridge ships for 3.11
+(`isaacsim.ros2.bridge/jazzy/rclpy`) imports only as far as
+`ImportError: librcl_action.so: cannot open shared object file` unless its
+sibling `jazzy/lib` is on `LD_LIBRARY_PATH`. Both together are the whole trick -
+put the bridge's rclpy on `sys.path` and the bridge's libs on
+`LD_LIBRARY_PATH`, and Isaac speaks ROS 2 natively.
+
+Full run in [`ros2_report.json`](ros2_report.json).
+
 ## Notes for anyone re-running this
 
 Three things cost real time, all of them Isaac Sim behaviours rather than scene

@@ -45,7 +45,10 @@ layers directly, which is the transferable, portable core skill:
   and stamped as `instanceable` references, the technique that keeps
   factory/warehouse twins light.
 - **Semantic geometry** — the AMR route is a first-class `BasisCurves` path, not
-  a baked mesh, so a nav stack (or Isaac Sim) can consume it.
+  a baked mesh, so a nav stack (or Isaac Sim) can consume it. It now does:
+  [`brev/ros2_bridge.py`](brev/) publishes it as a `nav_msgs/Path`, alongside
+  `sensor_msgs/JointState` for the four arms, verified over DDS with the system
+  `ros2` CLI.
 - **Physics & articulation** — the robot arms are real `UsdPhysics`
   articulations (see below), so Isaac Sim loads them as drivable robots.
 - **Animation** — workpieces are kinematic bodies driven by **time-sampled**
