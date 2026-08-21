@@ -141,6 +141,25 @@ window alone, the same joints move **0.07°** and return to target with **0.000�
 error. The swing was the arms leaving the rest pose at t=0, not reaction torque.
 There was nothing to fix — only something to measure correctly.
 
+## Path-traced rendering
+
+`render_rtx.py` opens the same stage, plays the authored timeline and
+path-traces each frame on the GPU. The preview in the root README is
+`--shot hero --frame-step 2 --spp 64` at 1280x720 — 97 frames in about 170 s on
+the L40S.
+
+```bash
+brev exec your-instance \
+  "docker exec isaac-lab-ex-ros2-isaac-sim-ex-1 bash -c \
+   'cd /workspace/home/ubuntu/factory-twin && \
+    /root/isaacsim/python.sh render_rtx.py --shot hero --frame-step 2 --spp 64'"
+```
+
+Three camera presets are included: `hero` (the whole plant), `line` (down the
+belt) and `station` (one workstation). The output is a numbered PNG sequence;
+`encode.sh` turns it into an mp4 and a looping gif with ffmpeg — run it wherever
+you have ffmpeg, the Isaac Sim image does not ship it.
+
 ## Notes for anyone re-running this
 
 Three things cost real time, all of them Isaac Sim behaviours rather than scene

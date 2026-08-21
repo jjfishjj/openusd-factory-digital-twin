@@ -11,12 +11,19 @@ and emits a `.usd` scene that opens directly in Omniverse / USD Composer /
 Isaac Sim on any RTX machine, where the placeholder primitives can be swapped
 for real CAD assets and lit with RTX path tracing.
 
+![RTX path-traced render](output/rtx_hero.gif)
+
+*The same USD, path-traced in **Isaac Sim 5.1 on an NVIDIA L40S** — 97 frames at
+64 spp. Nothing here is modelled for the render: the materials, the dome and key
+lights, the instanced racks and the joint trajectories are the ones the build
+script authored, finally shaded by the renderer they were written for.*
+
 ![Conveyor flow animation](output/conveyor.gif)
 
-*Closed-loop **pick-and-place**, rendered GPU-free straight from the USD. Each
-arm (orange, drawn by forward kinematics from its time-sampled joint drives)
-picks a part off the belt and sets it in an output bin, staggered across the four
-stations. Red = workpieces (riding the belt, then carried to the tan bins);
+*The same eight seconds without a GPU: closed-loop **pick-and-place** drawn
+straight from the USD. Each arm (orange, placed by forward kinematics from its
+time-sampled joint drives) picks a part off the belt and sets it in an output
+bin, staggered across the four stations. Red = workpieces (riding the belt, then carried to the tan bins);
 green = dynamic parts that drop in Isaac Sim; blue = instanced racks; yellow =
 AMR + route.*
 
