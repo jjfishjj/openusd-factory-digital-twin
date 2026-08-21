@@ -105,6 +105,10 @@ it is kinematic, the pick plays identically in the GPU-free GIF and in Isaac Sim
 > true contact-based grasping (attach/detach when the gripper touches the part)
 > needs an Isaac Sim runtime script (a `SurfaceGripper` or a scripted joint).
 > That is the natural next step; here the pick is authored and solver-independent.
+> [`brev/contact_grasp.py`](brev/) takes that step — a belt with real surface
+> velocity and a real `SurfaceGripper` on each arm. All four grippers grip their
+> own physically-transported part; the carry is not finished yet, and the
+> write-up says exactly where it stops and why.
 
 Verify the rigging without a GPU:
 

@@ -160,6 +160,85 @@ belt) and `station` (one workstation). The output is a numbered PNG sequence;
 `encode.sh` turns it into an mp4 and a looping gif with ffmpeg — run it wherever
 you have ffmpeg, the Isaac Sim image does not ship it.
 
+## Contact grasping: a physics-driven line
+
+`contact_grasp.py` replaces both halves of the fake with the real thing. The
+authored scene transports nothing and holds nothing: the workpieces are
+kinematic bodies whose transforms are time-sampled to *look* like they ride the
+belt, and the grasp is baked, with the carried part authored inside the gripper
+because USD has no time-varying parenting. This script instead gives the
+conveyor bed `PhysxSurfaceVelocityAPI`, so parts are carried by friction against
+a moving surface, and gives each arm an Isaac Sim `SurfaceGripper`, so a part is
+held by a constraint created on contact. The line indexes: the belt runs until
+the parts are at their stations, stops, the four arms pick in parallel.
+
+**6 of 8 checks pass.**
+
+| | |
+|---|---|
+| Belt physically transported every part | ✅ 0.74 m under friction |
+| Parts indexed onto each arm's aim point | ✅ within **0.01 m** |
+| A usable approach pose was found | ✅ shoulder −72°, elbow 14° |
+| Arms reached it | ✅ 3.8° |
+| **Every gripper gripped its own part** | ✅ **4 / 4** |
+| Grip survived the carry motion | ✅ |
+| Parts lifted off the belt | ❌ |
+| Parts delivered to their bins | ❌ |
+
+### Three hypotheses the measurements killed
+
+Nothing here was got right first time, and each correction came from
+instrumenting rather than reasoning harder:
+
+1. **"Suction points along the forearm."** link2's +Z is the forearm axis, so
+   the first version aimed the gripper along it. Measured at the pick pose it
+   points out and *up* — `fwd [-0.863, -0.076, +0.499]` — while the part sits
+   0.27 m below, giving `along -0.004, lateral 0.310`: the part square to the
+   side of the ray. link2's **−X** is what actually points at the part.
+2. **"Index the parts to the station centres."** The arms carry a per-robot yaw
+   (5, −8, 10, 0°), so each reach lands at its own y. Robot_01 was **0.448 m**
+   off and its suction grabbed `/World/ConveyorDrive` instead of the part.
+   Fixed by moving the arm first, *measuring* where each ray lands on the belt,
+   and indexing each part to that point — 0.028 m lateral error afterwards.
+3. **"Reuse the authored PICK pose."** `_CYCLE`'s pick pose was written for a
+   baked grasp, where the part is teleported into the gripper and no approach
+   clearance is ever needed. Under a real gripper it puts the suction face at
+   z ≈ 1.11, *below* the part's 1.175 top, so the arm swipes the part off the
+   belt. The script now sweeps candidate poses and measures, rather than
+   trusting the authored one.
+
+That third one is the substantive finding: **a baked trajectory has no approach
+segment, and nothing short of a real gripper reveals it.**
+
+### Known limitation: the carry
+
+The grippers report the part as held and keep reporting it through the carry,
+but the part does not move with the arm. Measured directly:
+
+```
+before PLACE  shoulder −72.0   link2 x = 0.557   Part_00 [−0.018, −7.667, 1.025]
+after  PLACE  shoulder +63.0   link2 x = 3.000   Part_00 [−0.018, −7.667, 1.025]
+```
+
+The arm swings; the part stays. The attachment point is a D6 joint, and this one
+is authored with a single body — `body0 = link2`, no `body1` — which makes it a
+free joint, so the grip registers without constraining anything.
+
+Authoring the D6 limits that the shipped `SurfaceGripper_gantry.usda` uses does
+not fix it: with only one body the joint anchors to the *world*, pinning link2
+so the arm could not reach its pose and ploughed the part 0.43 m down the belt.
+The sample's own topology is a separate suction-pad rigid body (`Gripper_Cones`)
+held to the arm by the compliant D6, with the part attached to the pad. Building
+that pad here made the arm move correctly again but the pads, joined to an
+articulation link with `excludeFromArticulation`, were not held by the D6 at
+all — they fell to z = −183 m and took the scene with them.
+
+So the remaining work is the pad mount, and it is a PhysX articulation-coupling
+problem rather than anything to do with the twin. What is committed is the
+configuration that reaches 6/8, and the checks that fail are reported as failing.
+
+Full run in [`contact_grasp_report.json`](contact_grasp_report.json).
+
 ## Notes for anyone re-running this
 
 Three things cost real time, all of them Isaac Sim behaviours rather than scene
